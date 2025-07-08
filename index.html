@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrettifyAI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/3.2.5/standalone.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/3.2.5/parser-babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/3.2.5/parser-html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/3.2.5/parser-postcss.min.js"></script>
+  <style>
+    #output, #output pre {
+      height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+    #output pre {
+      margin: 0;
+      height: 100%;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+    }
+    #output code.hljs {
+      flex: 1 1 auto;
+      height: 100%;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: block;
+    }
+  </style>
+</head>
+
+
+<body class="bg-gray-100 text-gray-900 h-screen p-4">
+  <div class="h-full flex flex-col">
+    <!-- <header class="text-xl font-semibold mb-4">Prettify AI</header> -->
+    <header class="text-xl font-semibold mb-4 flex items-center space-x-2">
+      <img src="logo.png" alt="Prettify AI Logo" class="w-8 h-8 rounded" />
+      <span>Prettify AI</span>
+    </header>
+    <button id="settingsBtn" class="absolute right-4 top-4 px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">⚙️</button>
+    <div class="flex flex-row gap-4 h-full">
+      <!-- Input -->
+      <div class="w-1/2 flex flex-col bg-white rounded-xl shadow p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium">Input</span>
+          <div class="flex items-center space-x-2">
+            <button id="clearBtn" class="text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">Clear</button>
+            <button id="aiFixBtn" class="inline-flex items-center gap-1 text-sm px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              AI Fix
+            </button>
+          </div>
+        </div>
+        <textarea class="flex-1 resize-none border rounded p-2 font-mono text-sm" placeholder="Paste your JSON/YAML/XML..."></textarea>
+      </div>
+
+      <!-- Output -->
+      <div class="w-1/2 flex flex-col bg-white rounded-xl shadow p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium">Output</span>
+          <div class="flex items-center space-x-2">
+            <select id="themeSelector" class="text-sm border rounded px-2 py-1">
+              <option>GitHub</option>
+              <option>Solarized Light</option>
+              <option>Atom One Light</option>
+              <option>VS</option>
+              <option>Default</option>
+              <option>Google Code</option>
+              <option>Android Studio</option>
+              <option>Lightfair</option>
+              <option>Idea</option>
+              <option>IntelliJ Light</option>
+            </select>
+            <button id="copyBtn" class="text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">Copy</button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-auto border rounded text-sm font-mono bg-transparent grow" id="output"><pre><code class="hljs">Formatted result here...</code></pre></div>
+      </div>
+    </div>
+    <footer class="text-xs text-gray-500 mt-2">Supported: JSON, YAML, XML, plus all popular code formats!</footer>
+  </div>
+  <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 hidden">
+    <div id="settingsPanel" class="bg-white shadow-lg border rounded-lg p-4 w-[40rem]">
+      <h3 class="font-semibold text-sm mb-2">Settings</h3>
+      <label class="block text-sm mb-1">Provider</label>
+      <select id="providerSelect" class="w-full mb-2 border rounded px-2 py-1 text-sm">
+        <option>ChatGPT</option>
+        <option>DeepSeek</option>
+        <option>Claude</option>
+      </select>
+      <label class="block text-sm mb-1">API Key</label>
+      <input id="apiKeyInput" type="text" class="w-full mb-3 border rounded px-2 py-1 text-sm" placeholder="Enter API Key..." />
+      <label class="block text-sm mb-1">Default Prompt</label>
+      <textarea id="promptInput" rows="9" class="w-full mb-3 border rounded px-2 py-1 text-sm" placeholder="Enter default prompt..."></textarea>
+      <button id="saveSettings" class="w-full bg-blue-500 text-white text-sm py-1 rounded hover:bg-blue-600">Save</button>
+    </div>
+  </div>
+  <script>
+    const themeMap = {
+      "GitHub": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css",
+      "Solarized Light": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/solarized-light.min.css",
+      "Atom One Light": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css",
+      "VS": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs.min.css",
+      "Default": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css",
+      "Google Code": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/googlecode.min.css",
+      "Android Studio": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/androidstudio.min.css",
+      "Lightfair": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/lightfair.min.css",
+      "Idea": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/idea.min.css",
+      "IntelliJ Light": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/intellij-light.min.css"
+    };
+
+    const themeSelector = document.getElementById("themeSelector");
+
+    themeSelector.addEventListener("change", (e) => {
+      const link = document.querySelector("link[href*='highlight.js']");
+      if (link && themeMap[e.target.value]) {
+        link.href = themeMap[e.target.value];
+      }
+      const bg = {
+        "GitHub": "#fff",
+        "Solarized Light": "#fdf6e3",
+        "Atom One Light": "#fafafa",
+        "VS": "#fff",
+        "Default": "#f8f8f8",
+        "Google Code": "#fff",
+        "Android Studio": "#2b2b2b",
+        "Lightfair": "#fefefe",
+        "Idea": "#ffffff",
+        "IntelliJ Light": "#ffffff"
+      };
+
+      document.getElementById('output').style.backgroundColor = bg[e.target.value] || 'transparent';
+    });
+    document.getElementById("settingsBtn").addEventListener("click", () => {
+      const modal = document.getElementById("settingsModal");
+      modal.classList.remove("hidden");
+    });
+
+    document.getElementById("saveSettings").addEventListener("click", () => {
+      const provider = document.getElementById("providerSelect").value;
+      const key = document.getElementById("apiKeyInput").value;
+      const prompt = document.getElementById("promptInput").value;
+      localStorage.setItem("ai_provider", provider);
+      localStorage.setItem("ai_key", key);
+      localStorage.setItem("ai_prompt", prompt);
+      alert("Settings saved!");
+      document.getElementById("settingsModal").classList.add("hidden");
+    });
+    // Restore settings after DOM and elements are ready
+    const savedProvider = localStorage.getItem("ai_provider");
+    const savedKey = localStorage.getItem("ai_key");
+    if (savedProvider) {
+      document.getElementById("providerSelect").value = savedProvider;
+    }
+    if (savedKey) {
+      document.getElementById("apiKeyInput").value = savedKey;
+    }
+  </script>
+
+  <script>
+    // Detect AI result format
+    function detectAIResultFormat(text) {
+      if (text.trim().startsWith("{") || text.trim().startsWith("[")) return "json";
+      if (text.trim().startsWith("<")) return "xml";
+      if (/^[\s\-]*\w+\s*:/m.test(text)) return "yaml";
+      return "plaintext";
+    }
+
+    // Strip the outermost markdown code fence (```lang ... ```) from the string if present.
+    // This removes only the first and last lines if they are markdown fences,
+    // without affecting any inner code fences inside the content.
+    function stripCodeFence(str) {
+      const lines = str.split('\n');
+      if (lines.length >= 3) {
+        const firstLine = lines[0].trim();
+        const lastLine = lines[lines.length - 1].trim();
+        if (firstLine.startsWith('```') && lastLine === '```') {
+          return lines.slice(1, lines.length - 1).join('\n');
+        }
+      }
+      return str;
+    }
+
+    async function callAI(text) {
+      const provider = localStorage.getItem("ai_provider");
+      const key = localStorage.getItem("ai_key");
+      const prompt = localStorage.getItem("ai_prompt") || "";
+
+      if (!provider || !key) {
+        alert("Please set provider and API key first.");
+        return;
+      }
+
+      let apiUrl = "";
+      let headers = {};
+      let body = {};
+
+      if (provider === "ChatGPT") {
+        apiUrl = "https://api.openai.com/v1/chat/completions";
+        headers = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`
+        };
+        body = {
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: text }
+          ]
+        };
+      } else if (provider === "DeepSeek") {
+        apiUrl = "https://api.deepseek.com/chat/completions";
+        headers = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`
+        };
+        body = {
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: text }
+          ]
+        };
+      } else {
+        alert("Provider not supported yet.");
+        return;
+      }
+
+      const output = document.getElementById("output");
+      output.innerHTML = "Loading...";
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        let result = data.choices?.[0]?.message?.content || "No response";
+
+        // Strip outermost markdown code fences if present
+        result = stripCodeFence(result);
+
+        // highlight.js 自动识别并高亮
+        const aiAuto = hljs.highlightAuto(result);
+        const code = document.createElement('code');
+        code.className = 'hljs';
+        code.innerHTML = aiAuto.value;
+        const pre = document.createElement('pre');
+        pre.appendChild(code);
+        output.innerHTML = "";
+        output.appendChild(pre);
+      } catch (err) {
+        output.innerHTML = "Error: " + err.message;
+      }
+    }
+
+    document.getElementById("aiFixBtn").addEventListener("click", () => {
+      const inputText = document.querySelector("textarea").value.trim();
+      if (inputText) {
+        callAI(inputText);
+      }
+    });
+  </script>
+</body>
+  <script>
+    function detectFormat(text) {
+      try {
+        JSON.parse(text);
+        return 'json';
+      } catch (_) {}
+
+      try {
+        jsyaml.load(text);
+        return 'yaml';
+      } catch (_) {}
+
+      if (text.trim().startsWith('<?xml') || text.trim().startsWith('<')) return 'xml';
+
+      return null;
+    }
+function isValidJson(text) {
+  try { JSON.parse(text); return true; } catch { return false; }
+}
+function isValidYaml(text) {
+  try { jsyaml.load(text); return true; } catch { return false; }
+}
+function isValidXml(text) {
+  try {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, "application/xml");
+    return !xml.querySelector("parsererror");
+  } catch { return false; }
+}
+
+function getFormat(text) {
+  if (text.trim().startsWith('{') || text.trim().startsWith('[')) return 'json';
+  if (text.trim().startsWith('<')) return 'xml';
+  if (/^[\s\-]*\w+\s*:/m.test(text)) return 'yaml';
+  return 'other';
+}
+
+function showErrorWithHighlight(msg) {
+  const output = document.getElementById('output');
+  const pre = document.createElement('pre');
+  const code = document.createElement('code');
+  code.className = 'hljs language-txt';
+  code.textContent = msg;
+  pre.appendChild(code);
+  output.innerHTML = '';
+  output.appendChild(pre);
+  hljs.highlightElement(code);
+}
+
+function beautifyAndHighlight() {
+  const input = document.querySelector('textarea').value.trim();
+  const output = document.getElementById('output');
+  output.innerHTML = '';
+  const type = getFormat(input);
+
+  // 只对三种结构化格式做合法性检测
+  if (type === 'json' && !isValidJson(input)) {
+    showErrorWithHighlight("Format Error, please use AI FIX");
+    return;
+  }
+  if (type === 'yaml' && !isValidYaml(input)) {
+    showErrorWithHighlight("Format Error, please use AI FIX");
+    return;
+  }
+  if (type === 'xml' && !isValidXml(input)) {
+    showErrorWithHighlight("Format Error, please use AI FIX");
+    return;
+  }
+
+  // 其它格式或结构化内容合法，全部高亮
+  const auto = hljs.highlightAuto(input);
+  const pre = document.createElement('pre');
+  const code = document.createElement('code');
+  code.className = 'hljs';
+  code.innerHTML = auto.value;
+  pre.appendChild(code);
+  output.appendChild(pre);
+}
+
+    document.querySelector('textarea').addEventListener('input', beautifyAndHighlight);
+
+    // Clear button logic（已改为通过id绑定）
+    // document.querySelector('.flex.items-center.space-x-2 > button').addEventListener('click', () => {
+    //   document.querySelector('textarea').value = '';
+    //   beautifyAndHighlight();
+    // });
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      document.querySelector('textarea').value = '';
+      beautifyAndHighlight();
+    });
+
+    // Copy button logic（已改为通过id绑定）
+    // document.querySelectorAll('.flex.items-center.space-x-2 > button')[1].addEventListener('click', () => {
+    //   const code = document.querySelector('#output code');
+    //   if (code) {
+    //     navigator.clipboard.writeText(code.textContent)
+    //       .then(() => { /* 可加 toast 成功提示 */ });
+    //   }
+    // });
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      const code = document.querySelector('#output code');
+      if (code) {
+        navigator.clipboard.writeText(code.textContent)
+          .then(() => { /* 可加 toast 成功提示 */ });
+      }
+    });
+  </script>
+
+  <!-- XML Beautifier -->
+  <script src="https://cdn.jsdelivr.net/npm/vkbeautify@0.99.00/vkbeautify.js"></script>
+
+  <script>
+    const defaultPrompt = `Analyze the input string and determine the most likely structured or code format it represents (for example, JSON, YAML, XML, HTML, JavaScript, Python, or any other common data or code format, even if surrounded by irrelevant text). Then, correct any syntax errors, formatting issues, or structural problems in the detected format.
+
+Return only the corrected, complete, and valid code or data.
+
+**Do NOT include any Markdown code fences, triple backticks (\`\`\`), explanations, or extra text—only output the code or data itself.**
+
+If you include any Markdown code fences, your answer will be considered invalid.`;
+
+    window.addEventListener('DOMContentLoaded', function() {
+      const savedPrompt = localStorage.getItem("ai_prompt");
+      document.getElementById("promptInput").value = savedPrompt || defaultPrompt;
+    });
+  </script>
+</html>
