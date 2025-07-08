@@ -69,6 +69,7 @@
           <span class="text-sm font-medium">Output</span>
           <div class="flex items-center space-x-2">
             <select id="themeSelector" class="text-sm border rounded px-2 py-1">
+              <option selected>IntelliJ Light</option>
               <option>GitHub</option>
               <option>Solarized Light</option>
               <option>Atom One Light</option>
@@ -78,7 +79,6 @@
               <option>Android Studio</option>
               <option>Lightfair</option>
               <option>Idea</option>
-              <option>IntelliJ Light</option>
             </select>
             <button id="copyBtn" class="text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">Copy</button>
           </div>
@@ -119,6 +119,33 @@
     };
 
     const themeSelector = document.getElementById("themeSelector");
+
+    // 页面初始化时，自动设置一次高亮主题和背景色
+    window.addEventListener('DOMContentLoaded', () => {
+      let themeName = themeSelector.value;
+      // Default to IntelliJ Light if nothing is set
+      if (!themeName || themeName === "") {
+        themeName = "IntelliJ Light";
+        themeSelector.value = "IntelliJ Light";
+      }
+      const link = document.querySelector("link[href*='highlight.js']");
+      if (link && themeMap[themeName]) {
+        link.href = themeMap[themeName];
+      }
+      const bg = {
+        "GitHub": "#fff",
+        "Solarized Light": "#fdf6e3",
+        "Atom One Light": "#fafafa",
+        "VS": "#fff",
+        "Default": "#f8f8f8",
+        "Google Code": "#fff",
+        "Android Studio": "#2b2b2b",
+        "Lightfair": "#fefefe",
+        "Idea": "#ffffff",
+        "IntelliJ Light": "#ffffff"
+      };
+      document.getElementById('output').style.backgroundColor = bg[themeName] || 'transparent';
+    });
 
     themeSelector.addEventListener("change", (e) => {
       const link = document.querySelector("link[href*='highlight.js']");
